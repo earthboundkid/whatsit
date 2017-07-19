@@ -9,14 +9,15 @@ import (
 )
 
 func main() {
-	flag.Parse()
-	if err := Run(flag.Arg(0)); err != nil {
+	if err := Run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
 }
 
-func Run(filename string) (err error) {
+func Run() (err error) {
+	flag.Parse()
+	filename := flag.Arg(0)
 	f := os.Stdin
 	if filename != "-" && filename != "" {
 		f, err = os.Open(filename)
@@ -26,18 +27,25 @@ func Run(filename string) (err error) {
 		defer DeferClose(&err, f.Close)
 	}
 
+	if ct, err := DetectContentType(f); err != nil {
+		return err
+	} else {
+		_, err = fmt.Println(ct)
+		return err
+	}
+}
+
+func DetectContentType(r io.Reader) (string, error) {
 	const magicSize = 512 // Size that DetectContentType expects
 	buf := make([]byte, magicSize)
 
-	n, err := io.ReadFull(f, buf)
+	n, err := io.ReadFull(r, buf)
 	if err != nil && err != io.ErrUnexpectedEOF {
-		return err
+		return "", err
 	}
 	buf = buf[:n]
 
-	ct := http.DetectContentType(buf)
-	_, err = fmt.Println(ct)
-	return err
+	return http.DetectContentType(buf), nil
 }
 
 func DeferClose(err *error, f func() error) {
